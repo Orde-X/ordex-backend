@@ -1,0 +1,23 @@
+{
+  "name": "ordex-backend",
+  "version": "1.0.0",
+  "description": "Refactor the backend using Django and implement DevOps practices.",
+  "homepage": "https://github.com/Orde-X/ordex-backend#readme",
+  "bugs": {
+    "url": "https://github.com/Orde-X/ordex-backend/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Orde-X/ordex-backend.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
