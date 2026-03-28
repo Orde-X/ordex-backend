@@ -1,0 +1,27 @@
+name: Remote Server Health Check
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs every day at midnight
+  workflow_dispatch:    # Allows you to run it manually from the "Actions" tab
+
+jobs:
+  check-servers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Health Script
+        env:
+          # Use GitHub Secrets to store your SSH Private Key
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          # Setup SSH key locally on the runner
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          
+          # Run your script
+          chmod +x ./server_health_check.sh
+          ./server_health_check.sh -f servers.txt -u your_username
