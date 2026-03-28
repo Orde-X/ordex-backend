@@ -11,8 +11,13 @@ const transporter = nodemailer.createTransport({
 });
 
 export const sendVerificationEmail = async (email: string, token: string): Promise<void> => {
-  const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
+  const verifyUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${token}`;
   
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn(`[Email MOCK] Would have sent verification email to ${email}. Link: ${verifyUrl}`);
+    return;
+  }
+
   await transporter.sendMail({
     from: '"Orde-X" <noreply@ordex.com>',
     to: email,
