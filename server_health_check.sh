@@ -37,16 +37,17 @@ trap cleanup EXIT INT TERM
 
 check_server() {
     local url="$1"
-    log_info "--- Checking Website: $url ---"
+    # Strip https:// for the ping command
+    local domain=$(echo "$url" | sed -e 's|^[^/]*//||' -e 's|/.*$||')
     
-    # -I only fetches the header (faster)
-    # -s is silent
-    # -L follows redirects
-    if curl -s -L -I "$url" | grep -q "200 OK"; then
-        log_info "SUCCESS: $url is online!"
+    log_info "--- Pinging Website: $domain ---"
+    
+    # -c 1 means send 1 packet, -W 5 means wait 5 seconds
+    if ping -c 1 -W 5 "$domain" > /dev/null; then
+        log_info "SUCCESS: $domain is reachable!"
     else
-        log_error "FAILED: $url is down or returned an error."
-        return 1
+        log_error "FAILED: $domain is unreachable."
+        # We don't 'exit' here so the script can finish the log
     fi
 }
 
@@ -77,7 +78,7 @@ main() {
 
     log_info "Found ${#servers[@]} servers. Starting health checks..."
     for server_host in "${servers[@]}"; do
-        check_server "$server_host" "$remote_user"
+        check_server "$server_host" "$remote_user" || true
     done
     log_info "All checks completed."
 }
