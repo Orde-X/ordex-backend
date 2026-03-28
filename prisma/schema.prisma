@@ -13,7 +13,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
+enum UserRole {
   BUYER
   SUPPLIER
   ADMIN
@@ -47,4 +47,13 @@ model SupplierProfile {
   companyName       String
   registrationNumber String @unique
   businessType      String
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String
+  ipAddress String?
+  details   String?
+  createdAt DateTime @default(now())
 }
