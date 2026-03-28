@@ -2,35 +2,26 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
+import dotenv from 'dotenv';
 
-import authRoutes from './modules/auth/auth.routes';
+import prisma from './core/database/prisma.client';
+import v1Routes from './core/routes/v1';
 
-const app = express();
+dotenv.config();
+
 const PORT = process.env.PORT || 5000;
+const app = express();
 
-// Phase 4: Security Headers
 app.use(helmet());
 
-// Basic Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: true,
   credentials: true
 }));
 app.use(express.json());
 app.use(morgan('dev'));
 
-// Phase 2: Rate Limiting
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: 'Too many requests from this IP, please try again after 15 minutes',
-});
-
-// Apply rate limiting specifically to auth routes to prevent brute-force attacks
-app.use('/api/v1/auth', authLimiter, authRoutes);
+app.use('/api/v1', v1Routes);
 
 // Base route
 app.get('/', (req, res) => {
@@ -43,6 +34,23 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ message: 'Internal Server Error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+const startServer = async () => {
+  try {
+    await prisma.$connect();
+    console.log("Connected to database");
+
+    if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
+      app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+      });
+    }
+  } catch (error: any) {
+    console.log("Failed to start server!", error.message);
+    if (process.env.NODE_ENV !== "production") {
+      process.exit(1);
+    }
+  }
+};
+
+startServer();
+export default app;
