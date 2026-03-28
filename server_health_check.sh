@@ -18,21 +18,36 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-check_server() {
-    local server="$1"
-    local user="$2"
-    log_info "--- Checking Server: $server ---"
+# check_server() {
+#     local server="$1"
+#     local user="$2"
+#     log_info "--- Checking Server: $server ---"
     
-    # Added StrictHostKeyChecking=no for automated environments
-    ssh -n -o ConnectTimeout=5 -o StrictHostKeyChecking=no "${user}@${server}" << 'EOF'
-        echo "--- System Uptime ---"
-        uptime
-        echo "--- Disk Usage (Root /) ---"
-        df -h / | awk 'NR==2 {print "Used: " $5 " (" $3 "/" $2 ")"}'
-        echo "--- Memory Usage ---"
-        free -m | awk 'NR==2 {printf "Used: %sMB / Total: %sMB (%.2f%%)\n", $3, $2, ($3/$2)*100}'
-EOF
-    log_info "--- Finished Check: $server ---"
+#     # Added StrictHostKeyChecking=no for automated environments
+#     ssh -n -o ConnectTimeout=5 -o StrictHostKeyChecking=no "${user}@${server}" << 'EOF'
+#         echo "--- System Uptime ---"
+#         uptime
+#         echo "--- Disk Usage (Root /) ---"
+#         df -h / | awk 'NR==2 {print "Used: " $5 " (" $3 "/" $2 ")"}'
+#         echo "--- Memory Usage ---"
+#         free -m | awk 'NR==2 {printf "Used: %sMB / Total: %sMB (%.2f%%)\n", $3, $2, ($3/$2)*100}'
+# EOF
+#     log_info "--- Finished Check: $server ---"
+# }
+
+check_server() {
+    local url="$1"
+    log_info "--- Checking Website: $url ---"
+    
+    # -I only fetches the header (faster)
+    # -s is silent
+    # -L follows redirects
+    if curl -s -L -I "$url" | grep -q "200 OK"; then
+        log_info "SUCCESS: $url is online!"
+    else
+        log_error "FAILED: $url is down or returned an error."
+        return 1
+    fi
 }
 
 main() {
