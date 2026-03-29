@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 
 import prisma from './core/database/prisma.client';
 import v1Routes from './core/routes/v1';
+import { setupSwagger } from './core/swagger';
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ app.use(express.json());
 app.use(morgan('dev'));
 
 app.use('/api/v1', v1Routes);
+setupSwagger(app);
 
 // Base route
 app.get('/', (req, res) => {
