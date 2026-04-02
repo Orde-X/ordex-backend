@@ -1,5 +1,44 @@
-node_modules
-# Keep environment variables out of version control
-.env
+# ===========================
+# Dependencies
+# ===========================
+node_modules/
 
+# ===========================
+# Build output
+# ===========================
+dist/
+
+# ===========================
+# Environment variables
+# ===========================
+.env
+.env.development
+.env.staging
+.env.production
+.env.local
+
+# ===========================
+# Logs
+# ===========================
+*.log
+npm-debug.log*
+pino.log*
+logs/
+
+# ===========================
+# Coverage
+# ===========================
+coverage/
+.nyc_output/
+
+# ===========================
+# Prisma generated client
+# ===========================
 /src/generated/prisma
+
+# ===========================
+# OS / Editor
+# ===========================
+.DS_Store
+Thumbs.db
+.vscode/settings.json

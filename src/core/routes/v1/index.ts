@@ -1,18 +1,48 @@
-import { Router } from "express";
-import rateLimit from "express-rate-limit";
-import authRoutes from "../../../modules/auth/auth.routes";
+import { Router } from 'express';
+
+import { authLimiter, orderLimiter, storefrontLimiter } from '../../middlewares/rate-limiter.middleware';
+import { adminAuthMiddleware } from '../../middlewares/admin-auth.middleware';
+import { tenantMiddleware } from '../../middlewares/tenant.middleware';
+import { planGuard } from '../../middlewares/plan-guard.middleware';
+import authRoutes from '../../../modules/auth/auth.routes';
+
+// ─── Placeholder routers (wired in as sprints complete) ───────────────────────
+// Uncomment each line as the module is built in later sprints
+// import productsRouter from '../../../modules/products/products.routes';
+// import customersRouter from '../../../modules/customers/customers.routes';
+// import ordersRouter from '../../../modules/orders/orders.routes';
+// import deliveryZonesRouter from '../../../modules/delivery-zones/delivery-zones.routes';
+// import analyticsRouter from '../../../modules/analytics/analytics.routes';
+// import storefrontRouter from '../../../modules/storefront/storefront.routes';
+// import adminRouter from '../../../modules/admin/admin.routes';
 
 const router = Router();
 
-// Apply rate limiting specifically to auth routes to prevent brute-force attacks
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per window
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: "Too many requests from this IP, please try again after 15 minutes",
-});
+// ─── [PUBLIC] Auth routes ─────────────────────────────────────────────────────
+router.use('/auth', authLimiter, authRoutes);
 
-router.use("/auth", authLimiter, authRoutes);
+// ─── [PUBLIC] Storefront routes ───────────────────────────────────────────────
+// router.use('/storefront', storefrontLimiter, storefrontRouter);
+
+// ─── [VENDOR JWT] Products ───────────────────────────────────────────────────
+// router.use('/products', tenantMiddleware, planGuard('product'), productsRouter);
+
+// ─── [VENDOR JWT] Orders ─────────────────────────────────────────────────────
+// router.use('/orders', tenantMiddleware, orderLimiter, planGuard('order'), ordersRouter);
+
+// ─── [VENDOR JWT] Customers ──────────────────────────────────────────────────
+// router.use('/customers', tenantMiddleware, customersRouter);
+
+// ─── [VENDOR JWT] Delivery Zones ─────────────────────────────────────────────
+// router.use('/delivery-zones', tenantMiddleware, deliveryZonesRouter);
+
+// ─── [VENDOR JWT] Analytics ──────────────────────────────────────────────────
+// router.use('/analytics', tenantMiddleware, analyticsRouter);
+
+// ─── [ADMIN] Admin panel ─────────────────────────────────────────────────────
+// router.use('/admin', adminAuthMiddleware, adminRouter);
 
 export default router;
+
+// Keep these in scope so tree-shaking doesn't remove them
+void [authLimiter, orderLimiter, storefrontLimiter, adminAuthMiddleware, tenantMiddleware, planGuard];

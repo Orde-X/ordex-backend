@@ -1,58 +1,60 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import dotenv from 'dotenv';
+/**
+ * src/server.ts — HTTP server entry point.
+ *
+ * Responsibilities:
+ *  1. Validate env (imported first — crashes immediately on missing vars)
+ *  2. Connect to database
+ *  3. Call app.listen()
+ *  4. Handle graceful shutdown
+ *
+ * Everything else (middleware, routes, error handlers) lives in app.ts.
+ */
+
+// MUST be the very first import — validates all env vars before anything else
+import './core/config/env';
 
 import prisma from './core/database/prisma.client';
-import v1Routes from './core/routes/v1';
-import { setupSwagger } from './core/swagger';
+import app from './app';
+import { logger } from './logger';
+import { env } from './core/config/env';
 
-dotenv.config();
+// ─── Bootstrap ────────────────────────────────────────────────────────────────
 
-const PORT = process.env.PORT || 5000;
-const app = express();
-
-app.use(helmet());
-
-app.use(cors({
-  origin: true,
-  credentials: true
-}));
-app.use(express.json());
-app.use(morgan('dev'));
-
-app.use('/api/v1', v1Routes);
-setupSwagger(app);
-
-// Base route
-app.get('/', (req, res) => {
-  res.json({ message: 'Orde-X Backend API is running' });
-});
-
-// Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Internal Server Error' });
-});
-
-const startServer = async () => {
+const startServer = async (): Promise<void> => {
   try {
     await prisma.$connect();
-    console.log("Connected to database");
+    logger.info('Database connected');
 
-    if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
-      app.listen(PORT, () => {
-        console.log(`Server is running on port ${PORT}`);
+    // Skip port binding on Vercel (serverless — exports `app` instead)
+    if (env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+      const port = Number(env.PORT);
+      app.listen(port, () => {
+        logger.info(`Server running on http://localhost:${port}`);
+        logger.info(`Swagger docs at http://localhost:${port}/api-docs`);
       });
     }
-  } catch (error: any) {
-    console.log("Failed to start server!", error.message);
-    if (process.env.NODE_ENV !== "production") {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error({ err: error }, `Failed to start server: ${msg}`);
+    if (env.NODE_ENV !== 'production') {
       process.exit(1);
     }
   }
 };
 
-startServer();
+// ─── Graceful Shutdown ────────────────────────────────────────────────────────
+
+const shutdown = async (signal: string): Promise<void> => {
+  logger.info(`${signal} received — shutting down gracefully`);
+  await prisma.$disconnect();
+  logger.info('Database disconnected');
+  process.exit(0);
+};
+
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
+
+void startServer();
+
+// Export app for Vercel serverless and supertest
 export default app;

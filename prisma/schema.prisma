@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,21 +10,54 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
 enum UserRole {
   BUYER
   SUPPLIER
   ADMIN
 }
 
+/// Product type — aligns with sprint doc CHECK constraint
+enum ProductType {
+  standard
+  made_to_order
+  perishable
+  digital
+}
+
+/// Order status — aligns exactly with sprint doc CHECK constraint
+enum OrderStatus {
+  pending
+  confirmed
+  preparing
+  out_for_delivery
+  delivered
+  cancelled
+  pending_cod_collection
+}
+
+enum PaymentMethod {
+  cod
+  card
+  wallet
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXISTING MODELS (Auth System — B2B)
+// ─────────────────────────────────────────────────────────────────────────────
+
 model User {
   id              String   @id @default(uuid())
   email           String   @unique
-  password        String   // Required for JWT auth
+  password        String
   firstName       String
   lastName        String
   role            UserRole @default(BUYER)
   isVerified      Boolean  @default(false)
-  
+
   buyerProfile    BuyerProfile?
   supplierProfile SupplierProfile?
   createdAt       DateTime @default(now())
@@ -41,12 +71,12 @@ model BuyerProfile {
 }
 
 model SupplierProfile {
-  id                String  @id @default(uuid())
-  userId            String  @unique
-  user              User    @relation(fields: [userId], references: [id])
-  companyName       String
-  registrationNumber String @unique
-  businessType      String
+  id                 String  @id @default(uuid())
+  userId             String  @unique
+  user               User    @relation(fields: [userId], references: [id])
+  companyName        String
+  registrationNumber String  @unique
+  businessType       String
 }
 
 model AuditLog {
@@ -56,4 +86,179 @@ model AuditLog {
   ipAddress String?
   details   String?
   createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STOREFRONT MODELS — Sprint 1 Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Vendor (merchant) account — each has their own storefront and slug
+model Vendor {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessNameAr    String    @db.VarChar(200)
+  businessNameEn    String?   @db.VarChar(200)
+  email             String    @unique @db.VarChar(255)
+  phone             String    @db.VarChar(20)
+  passwordHash      String    @db.VarChar(255)
+  storeSlug         String    @unique @db.VarChar(50)
+  logoUrl           String?
+  bannerUrl         String?
+  settings          Json      @default("{}")
+  planId            String?   @db.Uuid
+  trialEndsAt       DateTime?
+  isActive          Boolean   @default(true)
+  // Sprint 2: refresh token rotation (hash only — never store raw token)
+  refreshTokenHash  String?   @db.VarChar(255)
+  // Sprint 5: atomic per-vendor order numbering
+  lastOrderNumber   Int       @default(0)
+
+  plan              SubscriptionPlan? @relation(fields: [planId], references: [id])
+  products          Product[]
+  productVariants   ProductVariant[]
+  customers         Customer[]
+  orders            Order[]
+  deliveryZones     DeliveryZone[]
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("vendors")
+}
+
+/// Product listed on a vendor's storefront
+model Product {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vendorId      String      @db.Uuid
+  nameAr        String      @db.VarChar(300)
+  nameEn        String?     @db.VarChar(300)
+  descriptionAr String?
+  descriptionEn String?
+  productType   ProductType @default(standard)
+  basePrice     Decimal     @db.Decimal(10, 2)
+  isActive      Boolean     @default(true)
+  images        Json        @default("[]")
+  customFields  Json        @default("[]")
+  sortOrder     Int         @default(0)
+  // Soft delete — partial index in migration for performance
+  deletedAt     DateTime?
+
+  vendor        Vendor           @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  variants      ProductVariant[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([vendorId], name: "idx_products_vendor")
+  @@map("products")
+}
+
+/// Product variant (size + colour combination, etc.)
+model ProductVariant {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vendorId      String   @db.Uuid
+  productId     String   @db.Uuid
+  combination   Json     // e.g. { "size": "L", "color": "red" }
+  priceOverride Decimal? @db.Decimal(10, 2)
+  stock         Int?
+  sku           String?  @db.VarChar(100)
+
+  vendor        Vendor  @relation(fields: [vendorId], references: [id])
+  product       Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("product_variants")
+}
+
+/// Customer belonging to a specific vendor (phone-scoped, guest-friendly)
+model Customer {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vendorId  String    @db.Uuid
+  name      String    @db.VarChar(200)
+  phone     String    @db.VarChar(20)
+  addresses Json      @default("[]")
+  notes     String?
+  source    String?   @db.VarChar(50)
+  deletedAt DateTime?
+
+  vendor    Vendor  @relation(fields: [vendorId], references: [id])
+  orders    Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([vendorId, phone])
+  @@index([vendorId, phone], name: "idx_customers_vendor_phone")
+  @@map("customers")
+}
+
+/// Order placed on a vendor's storefront or manually entered by vendor
+model Order {
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vendorId            String        @db.Uuid
+  orderNumber         Int
+  customerId          String?       @db.Uuid
+  status              OrderStatus   @default(pending)
+  items               Json          // Snapshot of ordered items at time of purchase
+  subtotal            Decimal       @db.Decimal(10, 2)
+  deliveryFee         Decimal       @default(0) @db.Decimal(10, 2)
+  total               Decimal       @db.Decimal(10, 2)
+  paymentMethod       PaymentMethod @default(cod)
+  deliveryGovernorate String?       @db.VarChar(100)
+  deliveryAddress     String?
+  deliveryPromise     String?
+  codCollected        Boolean?
+  statusHistory       Json          @default("[]")
+  notes               String?
+  // Idempotency — prevents duplicate orders from double-submit
+  idempotencyKey      String?       @db.VarChar(100)
+
+  vendor              Vendor    @relation(fields: [vendorId], references: [id])
+  customer            Customer? @relation(fields: [customerId], references: [id])
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([vendorId, orderNumber])
+  @@unique([vendorId, idempotencyKey])
+  @@index([vendorId], name: "idx_orders_vendor")
+  @@index([vendorId, status], name: "idx_orders_status")
+  @@index([vendorId, createdAt(sort: Desc)], name: "idx_orders_vendor_created")
+  @@map("orders")
+}
+
+/// Delivery fee configuration per governorate per vendor
+model DeliveryZone {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vendorId              String   @db.Uuid
+  governorate           String   @db.VarChar(100)
+  fee                   Decimal  @default(0) @db.Decimal(10, 2)
+  freeDeliveryThreshold Decimal? @db.Decimal(10, 2)
+  isActive              Boolean  @default(true)
+
+  vendor                Vendor @relation(fields: [vendorId], references: [id])
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([vendorId, governorate])
+  @@index([vendorId], name: "idx_delivery_zones_vendor")
+  @@map("delivery_zones")
+}
+
+/// Subscription plans available to vendors (seeded, not created via API)
+model SubscriptionPlan {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String   @unique @db.VarChar(50)
+  priceEgp           Decimal? @db.Decimal(10, 2)
+  productLimit       Int?
+  orderLimitMonthly  Int?
+  features           Json     @default("{}")
+
+  vendors            Vendor[]
+
+  createdAt          DateTime @default(now())
+
+  @@map("subscription_plans")
 }
