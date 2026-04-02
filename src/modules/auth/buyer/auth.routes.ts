@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { signupBuyer, signupSupplier, login, verifyEmail, refreshToken, forgotPassword, verifySupplier } from './auth.controller';
-import { isAuthenticated, checkRole } from './auth.middlewares';
+import { isAuthenticated, checkRole } from '../auth.middlewares';
 import { UserRole } from '@prisma/client';
-import { validateRequest } from '../../core/middlewares/validate.middleware';
+import { validateRequest } from '../../../core/middlewares/validate.middleware';
 import { buyerSignupSchema, supplierSignupSchema, loginSchema } from './auth.validation';
 
 const router = Router();

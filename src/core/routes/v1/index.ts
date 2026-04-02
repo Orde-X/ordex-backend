@@ -4,7 +4,8 @@ import { authLimiter, orderLimiter, storefrontLimiter } from '../../middlewares/
 import { adminAuthMiddleware } from '../../middlewares/admin-auth.middleware';
 import { tenantMiddleware } from '../../middlewares/tenant.middleware';
 import { planGuard } from '../../middlewares/plan-guard.middleware';
-import authRoutes from '../../../modules/auth/auth.routes';
+import authRoutes from '../../../modules/auth/buyer/auth.routes';
+import vendorAuthRoutes from '../../../modules/auth/vendor/vendor-auth.routes';
 
 // ─── Placeholder routers (wired in as sprints complete) ───────────────────────
 // Uncomment each line as the module is built in later sprints
@@ -20,6 +21,7 @@ const router = Router();
 
 // ─── [PUBLIC] Auth routes ─────────────────────────────────────────────────────
 router.use('/auth', authLimiter, authRoutes);
+router.use('/auth', authLimiter, vendorAuthRoutes);
 
 // ─── [PUBLIC] Storefront routes ───────────────────────────────────────────────
 // router.use('/storefront', storefrontLimiter, storefrontRouter);

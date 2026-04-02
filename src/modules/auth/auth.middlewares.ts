@@ -20,10 +20,20 @@ export const isAuthenticated = (req: AuthRequest, res: Response, next: NextFunct
     const token = authHeader.split(' ')[1];
     const payload = verifyAccessToken(token);
 
-    req.user = {
-      userId: payload.userId,
-      role: payload.role as UserRole
-    };
+    if (payload.userId) {
+      req.user = {
+        userId: payload.userId,
+        role: payload.role as UserRole
+      };
+    }
+
+    if (payload.vendor_id) {
+      (req as any).vendor = {
+        vendor_id: payload.vendor_id,
+        email: payload.email,
+        plan_id: payload.plan_id,
+      };
+    }
 
     next();
   } catch (error) {
