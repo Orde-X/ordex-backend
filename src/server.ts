@@ -91,14 +91,14 @@ app.use(globalErrorHandler);
 const startServer = async (): Promise<void> => {
   try {
     await prisma.$connect();
-    logger.info('✅  Database connected');
+    logger.info('Database connected');
 
     // Only bind to a port when not running on Vercel serverless
     if (env.NODE_ENV !== 'production' || !process.env.VERCEL) {
       const port = Number(env.PORT);
       app.listen(port, () => {
-        logger.info(`🚀  Server running on http://localhost:${port}`);
-        logger.info(`📖  Swagger docs at http://localhost:${port}/api-docs`);
+        logger.info(`Server running on http://localhost:${port}`);
+        logger.info(`Swagger docs at http://localhost:${port}/api-docs`);
       });
     }
   } catch (error: unknown) {
