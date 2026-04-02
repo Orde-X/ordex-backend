@@ -20,20 +20,23 @@ enum UserRole {
   ADMIN
 }
 
+/// Product type — aligns with sprint doc CHECK constraint
 enum ProductType {
   standard
-  variable
+  made_to_order
+  perishable
   digital
 }
 
+/// Order status — aligns exactly with sprint doc CHECK constraint
 enum OrderStatus {
   pending
   confirmed
   preparing
-  shipped
+  out_for_delivery
   delivered
   cancelled
-  refunded
+  pending_cod_collection
 }
 
 enum PaymentMethod {
@@ -43,7 +46,7 @@ enum PaymentMethod {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EXISTING MODELS (Auth System)
+// EXISTING MODELS (Auth System — B2B)
 // ─────────────────────────────────────────────────────────────────────────────
 
 model User {
@@ -86,42 +89,46 @@ model AuditLog {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SPRINT 1 — STOREFRONT MODELS
+// STOREFRONT MODELS — Sprint 1 Schema
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Vendor (merchant) account — each vendor has their own storefront
+/// Vendor (merchant) account — each has their own storefront and slug
 model Vendor {
-  id               String    @id @default(uuid())
-  businessNameAr   String    @db.VarChar(200)
-  businessNameEn   String?   @db.VarChar(200)
-  email            String    @unique @db.VarChar(255)
-  phone            String    @db.VarChar(20)
-  passwordHash     String    @db.VarChar(255)
-  storeSlug        String    @unique @db.VarChar(50)
-  logoUrl          String?
-  bannerUrl        String?
-  settings         Json      @default("{}")
-  planId           String?
-  trialEndsAt      DateTime?
-  isActive         Boolean   @default(true)
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessNameAr    String    @db.VarChar(200)
+  businessNameEn    String?   @db.VarChar(200)
+  email             String    @unique @db.VarChar(255)
+  phone             String    @db.VarChar(20)
+  passwordHash      String    @db.VarChar(255)
+  storeSlug         String    @unique @db.VarChar(50)
+  logoUrl           String?
+  bannerUrl         String?
+  settings          Json      @default("{}")
+  planId            String?   @db.Uuid
+  trialEndsAt       DateTime?
+  isActive          Boolean   @default(true)
+  // Sprint 2: refresh token rotation (hash only — never store raw token)
+  refreshTokenHash  String?   @db.VarChar(255)
+  // Sprint 5: atomic per-vendor order numbering
+  lastOrderNumber   Int       @default(0)
 
-  plan             SubscriptionPlan? @relation(fields: [planId], references: [id])
-  products         Product[]
-  productVariants  ProductVariant[]
-  customers        Customer[]
-  orders           Order[]
-  deliveryZones    DeliveryZone[]
+  plan              SubscriptionPlan? @relation(fields: [planId], references: [id])
+  products          Product[]
+  productVariants   ProductVariant[]
+  customers         Customer[]
+  orders            Order[]
+  deliveryZones     DeliveryZone[]
 
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@map("vendors")
 }
 
 /// Product listed on a vendor's storefront
 model Product {
-  id            String      @id @default(uuid())
-  vendorId      String
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vendorId      String      @db.Uuid
   nameAr        String      @db.VarChar(300)
   nameEn        String?     @db.VarChar(300)
   descriptionAr String?
@@ -132,8 +139,10 @@ model Product {
   images        Json        @default("[]")
   customFields  Json        @default("[]")
   sortOrder     Int         @default(0)
+  // Soft delete — partial index in migration for performance
+  deletedAt     DateTime?
 
-  vendor        Vendor           @relation(fields: [vendorId], references: [id])
+  vendor        Vendor           @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   variants      ProductVariant[]
 
   createdAt     DateTime @default(now())
@@ -143,11 +152,11 @@ model Product {
   @@map("products")
 }
 
-/// Product variant (e.g. size + colour combination)
+/// Product variant (size + colour combination, etc.)
 model ProductVariant {
-  id            String   @id @default(uuid())
-  vendorId      String
-  productId     String
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vendorId      String   @db.Uuid
+  productId     String   @db.Uuid
   combination   Json     // e.g. { "size": "L", "color": "red" }
   priceOverride Decimal? @db.Decimal(10, 2)
   stock         Int?
@@ -162,10 +171,10 @@ model ProductVariant {
   @@map("product_variants")
 }
 
-/// Customer belonging to a specific vendor's store
+/// Customer belonging to a specific vendor (phone-scoped, guest-friendly)
 model Customer {
-  id        String    @id @default(uuid())
-  vendorId  String
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vendorId  String    @db.Uuid
   name      String    @db.VarChar(200)
   phone     String    @db.VarChar(20)
   addresses Json      @default("[]")
@@ -184,14 +193,14 @@ model Customer {
   @@map("customers")
 }
 
-/// Order placed on a vendor's storefront
+/// Order placed on a vendor's storefront or manually entered by vendor
 model Order {
-  id                  String        @id @default(uuid())
-  vendorId            String
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vendorId            String        @db.Uuid
   orderNumber         Int
-  customerId          String?
+  customerId          String?       @db.Uuid
   status              OrderStatus   @default(pending)
-  items               Json          // Array of OrderItem snapshots
+  items               Json          // Snapshot of ordered items at time of purchase
   subtotal            Decimal       @db.Decimal(10, 2)
   deliveryFee         Decimal       @default(0) @db.Decimal(10, 2)
   total               Decimal       @db.Decimal(10, 2)
@@ -202,6 +211,8 @@ model Order {
   codCollected        Boolean?
   statusHistory       Json          @default("[]")
   notes               String?
+  // Idempotency — prevents duplicate orders from double-submit
+  idempotencyKey      String?       @db.VarChar(100)
 
   vendor              Vendor    @relation(fields: [vendorId], references: [id])
   customer            Customer? @relation(fields: [customerId], references: [id])
@@ -210,15 +221,17 @@ model Order {
   updatedAt           DateTime  @updatedAt
 
   @@unique([vendorId, orderNumber])
+  @@unique([vendorId, idempotencyKey])
   @@index([vendorId], name: "idx_orders_vendor")
   @@index([vendorId, status], name: "idx_orders_status")
+  @@index([vendorId, createdAt(sort: Desc)], name: "idx_orders_vendor_created")
   @@map("orders")
 }
 
-/// Delivery fee config per governorate per vendor
+/// Delivery fee configuration per governorate per vendor
 model DeliveryZone {
-  id                    String   @id @default(uuid())
-  vendorId              String
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vendorId              String   @db.Uuid
   governorate           String   @db.VarChar(100)
   fee                   Decimal  @default(0) @db.Decimal(10, 2)
   freeDeliveryThreshold Decimal? @db.Decimal(10, 2)
@@ -234,10 +247,10 @@ model DeliveryZone {
   @@map("delivery_zones")
 }
 
-/// Subscription plans available to vendors
+/// Subscription plans available to vendors (seeded, not created via API)
 model SubscriptionPlan {
-  id                 String   @id @default(uuid())
-  name               String   @db.VarChar(50)
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String   @unique @db.VarChar(50)
   priceEgp           Decimal? @db.Decimal(10, 2)
   productLimit       Int?
   orderLimitMonthly  Int?
