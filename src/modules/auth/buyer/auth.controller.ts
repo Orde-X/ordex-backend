@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
 import { BuyerSignupInput, SupplierSignupInput, LoginInput } from './auth.types';
-import prisma from '../../core/database/prisma.client';
-import { hashPassword, comparePasswords } from '../../core/utils/password.utils';
-import { generateAccessToken, generateRefreshToken } from '../../core/utils/jwt.utils';
-import { sendVerificationEmail } from '../../core/utils/email.utils';
+import prisma from '../../../core/database/prisma.client';
+import { hashPassword, comparePasswords } from '../../../core/utils/password.utils';
+import { generateAccessToken, generateRefreshToken } from '../../../core/utils/jwt.utils';
+import { sendVerificationEmail } from '../../../core/utils/email.utils';
 import { UserRole } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 

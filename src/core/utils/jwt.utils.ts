@@ -1,25 +1,32 @@
 import jwt from 'jsonwebtoken';
-
-const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'fallback_access_secret';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'fallback_refresh_secret';
+import { env } from '../config/env';
 
 export interface JwtPayload {
-  userId: string;
-  role: string;
+  userId?: string;
+  vendor_id?: string;
+  email?: string;
+  plan_id?: string;
+  role?: string;
 }
 
 export const generateAccessToken = (payload: JwtPayload): string => {
-  return jwt.sign(payload, JWT_ACCESS_SECRET, { expiresIn: '15m' });
+  return jwt.sign(payload, env.JWT_PRIVATE_KEY, {
+    algorithm: 'RS256',
+    expiresIn: env.JWT_ACCESS_EXPIRES_IN as any,
+  });
 };
 
 export const generateRefreshToken = (payload: JwtPayload): string => {
-  return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, env.JWT_PRIVATE_KEY, {
+    algorithm: 'RS256',
+    expiresIn: env.JWT_REFRESH_EXPIRES_IN as any,
+  });
 };
 
-export const verifyAccessToken = (token: string): JwtPayload => {
-  return jwt.verify(token, JWT_ACCESS_SECRET) as JwtPayload;
+export const verifyToken = (token: string): JwtPayload => {
+  return jwt.verify(token, env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] }) as JwtPayload;
 };
 
-export const verifyRefreshToken = (token: string): JwtPayload => {
-  return jwt.verify(token, JWT_REFRESH_SECRET) as JwtPayload;
-};
+// Aliased for backwards compatibility but we'll use verifyToken going forward
+export const verifyAccessToken = verifyToken;
+export const verifyRefreshToken = verifyToken;
