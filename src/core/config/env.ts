@@ -12,21 +12,24 @@ const envSchema = z.object({
   // Redis
   REDIS_URL: z.string().url('REDIS_URL must be a valid URL').default('redis://localhost:6379'),
 
-  // JWT
-  JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
-  JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
+  // JWT — RS256 asymmetric keys (PEM format, \n for newlines in .env)
+  JWT_PRIVATE_KEY: z.string().min(1, 'JWT_PRIVATE_KEY is required (RS256 PEM private key)'),
+  JWT_PUBLIC_KEY: z.string().min(1, 'JWT_PUBLIC_KEY is required (RS256 PEM public key)'),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
-  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+  JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
+
+  // Admin JWT — separate HS256 secret for admin panel
+  ADMIN_JWT_SECRET: z.string().min(32, 'ADMIN_JWT_SECRET must be at least 32 characters'),
 
   // CORS — comma-separated origins
   ALLOWED_ORIGINS: z.string().default('http://localhost:3000'),
 
-  // Cloudflare R2 — optional in development
-  R2_ACCOUNT_ID: z.string().optional(),
-  R2_ACCESS_KEY_ID: z.string().optional(),
-  R2_SECRET_ACCESS_KEY: z.string().optional(),
-  R2_BUCKET_NAME: z.string().optional(),
-  R2_PUBLIC_URL: z.string().optional(),
+  // Cloudflare R2 Storage
+  R2_ACCOUNT_ID: z.string().min(1, 'R2_ACCOUNT_ID is required'),
+  R2_ACCESS_KEY_ID: z.string().min(1, 'R2_ACCESS_KEY_ID is required'),
+  R2_SECRET_ACCESS_KEY: z.string().min(1, 'R2_SECRET_ACCESS_KEY is required'),
+  R2_BUCKET_NAME: z.string().min(1, 'R2_BUCKET_NAME is required'),
+  R2_PUBLIC_URL: z.string().url('R2_PUBLIC_URL must be a valid URL'),
 
   // SMTP
   SMTP_HOST: z.string().default('smtp.gmail.com'),
@@ -35,8 +38,23 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
 });
 
+// ─── Development overrides — make R2 keys optional locally ───────────────────
+const devSchema = envSchema.extend({
+  JWT_PRIVATE_KEY: z.string().default('dev_private_key_placeholder'),
+  JWT_PUBLIC_KEY: z.string().default('dev_public_key_placeholder'),
+  ADMIN_JWT_SECRET: z.string().min(32).default('dev_admin_secret_change_me_in_prod_32c'),
+  R2_ACCOUNT_ID: z.string().default('dev'),
+  R2_ACCESS_KEY_ID: z.string().default('dev'),
+  R2_SECRET_ACCESS_KEY: z.string().default('dev'),
+  R2_BUCKET_NAME: z.string().default('dev'),
+  R2_PUBLIC_URL: z.string().default('http://localhost'),
+});
+
+const isDev = process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'staging';
+const schema = isDev ? devSchema : envSchema;
+
 // ─── Parse & Validate ────────────────────────────────────────────────────────
-const _parsed = envSchema.safeParse(process.env);
+const _parsed = schema.safeParse(process.env);
 
 if (!_parsed.success) {
   console.error('Invalid environment variables:\n');
