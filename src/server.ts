@@ -1,90 +1,22 @@
-// ─── Load & validate env FIRST — before any other imports ───────────────────
+/**
+ * src/server.ts — HTTP server entry point.
+ *
+ * Responsibilities:
+ *  1. Validate env (imported first — crashes immediately on missing vars)
+ *  2. Connect to database
+ *  3. Call app.listen()
+ *  4. Handle graceful shutdown
+ *
+ * Everything else (middleware, routes, error handlers) lives in app.ts.
+ */
+
+// MUST be the very first import — validates all env vars before anything else
 import './core/config/env';
 
-import cors from 'cors';
-import express from 'express';
-import helmet from 'helmet';
-import pino from 'pino';
-import pinoHttp from 'pino-http';
-
-import { allowedOrigins, env } from './core/config/env';
-import { globalErrorHandler } from './core/middlewares/error.middleware';
-import { notFoundHandler } from './core/middlewares/not-found.middleware';
 import prisma from './core/database/prisma.client';
-import v1Routes from './core/routes/v1';
-import { setupSwagger } from './core/swagger';
-
-// ─── Logger ───────────────────────────────────────────────────────────────────
-
-export const logger = pino({
-  level: env.NODE_ENV === 'production' ? 'info' : 'debug',
-  transport:
-    env.NODE_ENV !== 'production'
-      ? { target: 'pino-pretty', options: { colorize: true } }
-      : undefined,
-});
-
-// ─── App Setup ────────────────────────────────────────────────────────────────
-
-const app = express();
-
-// Security headers
-app.use(helmet());
-
-// CORS — restricted to explicit allow-list
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. curl, Postman, same-origin)
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`Origin ${origin} is not allowed by CORS`));
-      }
-    },
-    credentials: true,
-  }),
-);
-
-// Request body parsing
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// HTTP request logging (Pino)
-app.use(
-  pinoHttp({
-    logger,
-    quietReqLogger: true,
-    customLogLevel: (_req, res) => {
-      if (res.statusCode >= 500) return 'error';
-      if (res.statusCode >= 400) return 'warn';
-      return 'info';
-    },
-  }),
-);
-
-// ─── Routes ───────────────────────────────────────────────────────────────────
-
-app.get('/', (_req, res) => {
-  res.json({
-    data: {
-      name: 'Orde-X Backend API',
-      version: '1.0.0',
-      status: 'running',
-      environment: env.NODE_ENV,
-    },
-    meta: {},
-    error: null,
-  });
-});
-
-app.use('/api/v1', v1Routes);
-setupSwagger(app);
-
-// ─── Error Handling (must come after routes) ──────────────────────────────────
-
-app.use(notFoundHandler);
-app.use(globalErrorHandler);
+import app from './app';
+import { logger } from './logger';
+import { env } from './core/config/env';
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
 
@@ -93,7 +25,7 @@ const startServer = async (): Promise<void> => {
     await prisma.$connect();
     logger.info('Database connected');
 
-    // Only bind to a port when not running on Vercel serverless
+    // Skip port binding on Vercel (serverless — exports `app` instead)
     if (env.NODE_ENV !== 'production' || !process.env.VERCEL) {
       const port = Number(env.PORT);
       app.listen(port, () => {
@@ -124,4 +56,5 @@ process.on('SIGINT', () => void shutdown('SIGINT'));
 
 void startServer();
 
+// Export app for Vercel serverless and supertest
 export default app;
