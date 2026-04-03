@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 import { sendError } from '../utils/response';
 
@@ -19,6 +19,7 @@ export const authLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req),
   handler: (_req, res) => {
     res.status(429).json(
       rateLimitResponse('Too many attempts, please try again in 1 minute.', 'RATE_LIMITED'),
@@ -34,9 +35,16 @@ export const authLimiter = rateLimit({
 export const orderLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
-  keyGenerator: (req) => (req.vendorId ?? req.ip) as string,
+  keyGenerator: (req) => {
+    if (req.vendorId) {
+      return `vendor-${req.vendorId}`;
+    }
+    return ipKeyGenerator(req);
+  },
   handler: (_req, res) => {
-    res.status(429).json(rateLimitResponse('Order rate limit exceeded.', 'RATE_LIMITED'));
+    res.status(429).json(
+      rateLimitResponse('Order rate limit exceeded.', 'RATE_LIMITED')
+    );
   },
 });
 
@@ -47,11 +55,16 @@ export const orderLimiter = rateLimit({
 export const generalLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 300,
-  keyGenerator: (req) => (req.vendorId ?? req.ip) as string,
+  keyGenerator: (req) => {
+    if (req.vendorId) {
+      return `vendor-${req.vendorId}`;
+    }
+    return ipKeyGenerator(req);
+  },
   handler: (_req, res) => {
-    res
-      .status(429)
-      .json(rateLimitResponse('Rate limit exceeded, slow down.', 'RATE_LIMITED'));
+    res.status(429).json(
+      rateLimitResponse('Rate limit exceeded, slow down.', 'RATE_LIMITED')
+    );
   },
 });
 
@@ -62,6 +75,7 @@ export const generalLimiter = rateLimit({
 export const storefrontLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
+  keyGenerator: (req) => ipKeyGenerator(req),
   handler: (_req, res) => {
     res.status(429).json(rateLimitResponse('Too many requests.', 'RATE_LIMITED'));
   },
