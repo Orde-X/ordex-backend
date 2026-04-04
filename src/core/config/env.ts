@@ -25,12 +25,8 @@ const envSchema = z.object({
   // CORS — comma-separated origins
   ALLOWED_ORIGINS: z.string().default('http://localhost:3000'),
 
-  // Cloudflare R2 Storage
-  R2_ACCOUNT_ID: z.string().min(1, 'R2_ACCOUNT_ID is required'),
-  R2_ACCESS_KEY_ID: z.string().min(1, 'R2_ACCESS_KEY_ID is required'),
-  R2_SECRET_ACCESS_KEY: z.string().min(1, 'R2_SECRET_ACCESS_KEY is required'),
-  R2_BUCKET_NAME: z.string().min(1, 'R2_BUCKET_NAME is required'),
-  R2_PUBLIC_URL: z.string().url('R2_PUBLIC_URL must be a valid URL'),
+  // Cloudinary Storage
+  CLOUDINARY_URL: z.string().url('CLOUDINARY_URL must be a valid URL'),
 
   // SMTP
   SMTP_HOST: z.string().default('smtp.gmail.com'),
@@ -39,16 +35,12 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
 });
 
-// ─── Development overrides — make R2 keys optional locally ───────────────────
+// ─── Development overrides — make keys optional locally ───────────────────
 const devSchema = envSchema.extend({
   JWT_PRIVATE_KEY: z.string().default('dev_private_key_placeholder'),
   JWT_PUBLIC_KEY: z.string().default('dev_public_key_placeholder'),
   ADMIN_JWT_SECRET: z.string().min(32).default('dev_admin_secret_change_me_in_prod_32c'),
-  R2_ACCOUNT_ID: z.string().default('dev'),
-  R2_ACCESS_KEY_ID: z.string().default('dev'),
-  R2_SECRET_ACCESS_KEY: z.string().default('dev'),
-  R2_BUCKET_NAME: z.string().default('dev'),
-  R2_PUBLIC_URL: z.string().default('http://localhost'),
+  CLOUDINARY_URL: z.string().default('cloudinary://dev:dev@dev'),
 });
 
 const isDev = process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'staging';

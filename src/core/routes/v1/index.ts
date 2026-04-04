@@ -9,12 +9,12 @@ import vendorAuthRoutes from '../../../modules/auth/vendor/vendor-auth.routes';
 
 // ─── Placeholder routers (wired in as sprints complete) ───────────────────────
 // Uncomment each line as the module is built in later sprints
-// import productsRouter from '../../../modules/products/products.routes';
+import productsRouter from '../../../modules/product/vendor/product.routes';
 // import customersRouter from '../../../modules/customers/customers.routes';
 // import ordersRouter from '../../../modules/orders/orders.routes';
 // import deliveryZonesRouter from '../../../modules/delivery-zones/delivery-zones.routes';
 // import analyticsRouter from '../../../modules/analytics/analytics.routes';
-// import storefrontRouter from '../../../modules/storefront/storefront.routes';
+import storefrontRouter from '../../../modules/product/storefront/storefront.routes';
 // import adminRouter from '../../../modules/admin/admin.routes';
 
 const router = Router();
@@ -24,10 +24,10 @@ router.use('/auth', authLimiter, authRoutes);
 router.use('/auth', authLimiter, vendorAuthRoutes);
 
 // ─── [PUBLIC] Storefront routes ───────────────────────────────────────────────
-// router.use('/storefront', storefrontLimiter, storefrontRouter);
+router.use('/storefront', storefrontRouter);
 
 // ─── [VENDOR JWT] Products ───────────────────────────────────────────────────
-// router.use('/products', tenantMiddleware, planGuard('product'), productsRouter);
+router.use('/products', productsRouter);
 
 // ─── [VENDOR JWT] Orders ─────────────────────────────────────────────────────
 // router.use('/orders', tenantMiddleware, orderLimiter, planGuard('order'), ordersRouter);
